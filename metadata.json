@@ -1,0 +1,6 @@
+{
+  "name": "Briants Lawnmower Expert Bot",
+  "description": "An expert AI assistant from Briants to help you find the perfect lawnmower. Ask questions about your lawn, desired features, and get product recommendations from our range.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
