@@ -19,7 +19,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-gray-200 shadow- ऊपर">
+    <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-gray-200 shadow-md">
       <div className="flex items-center space-x-3">
         <input
           type="text"
@@ -28,11 +28,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
           placeholder="Ask about lawnmowers..."
           className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-shadow"
           disabled={isLoading}
+          aria-label="Chat input field"
         />
         <button
           type="submit"
           disabled={isLoading || !inputValue.trim()}
           className="bg-primary hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          aria-label="Send message"
         >
           {isLoading ? <Spinner /> : (
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">

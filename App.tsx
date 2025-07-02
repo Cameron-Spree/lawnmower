@@ -2,18 +2,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chat } from '@google/genai';
 import { ChatMessageData } from './types';
-import { createChatSession, sendMessageToBot } from './services/geminiService';
+import { createChatSession, sendMessageToBot, addDebugLog, getAndClearDebugLogs, LogEntry } from './services/geminiService';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
-import Spinner from './components/Spinner'; // Used for initial loading
+import Spinner from './components/Spinner';
+import UserIdModal from './components/UserIdModal'; // Import the new modal
+
+const examplePromptsArray = [
+  "What's best for a small, hilly lawn?",
+  "Show me petrol mowers with a rear roller",
+  "I need a cordless mower for a medium garden",
+  "Compare robotic vs traditional mowers"
+];
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [chatSession, setChatSession] = useState<Chat | null>(null);
   const [isLoading, setIsLoading] = useState(false); // For message sending
-  const [isInitializing, setIsInitializing] = useState(true); // For initial chat session setup
   const [error, setError] = useState<string | null>(null);
+  const [showInitialPrompts, setShowInitialPrompts] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [debugLogMessages, setDebugLogMessages] = useState<LogEntry[]>([]);
+  
+  // State for User ID and Session ID
+  const [userId, setUserId] = useState<string>('');
+  const [sessionId] = useState<string>(() => Date.now().toString(36) + Math.random().toString(36).substring(2));
+
+  // States for initialization flow
+  const [showUserIdModal, setShowUserIdModal] = useState<boolean>(true);
+  const [isChatInitializing, setIsChatInitializing] = useState<boolean>(false);
+  const [chatInitialized, setChatInitialized] = useState<boolean>(false);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -21,37 +40,94 @@ const App: React.FC = () => {
 
   useEffect(scrollToBottom, [messages]);
 
-  useEffect(() => {
-    const initializeChat = async () => {
-      setIsInitializing(true);
-      setError(null);
-      try {
-        const session = createChatSession();
-        setChatSession(session);
-        setMessages([
-          { 
-            id: 'initial-bot-' + Date.now(), 
-            text: "Hello! I'm Briants Lawnmower Expert Bot. I'm here to help you find the perfect lawnmower from our range. To get started, tell me a bit about your lawn (e.g., size, type of grass) and what you're looking for. For example, 'What's best for a small, hilly lawn?' or 'Show me petrol mowers with a rear roller'.", 
-            sender: 'bot', 
-            timestamp: new Date() 
-          }
-        ]);
-      } catch (e) {
-        console.error("Failed to initialize chat session:", e);
-        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during initialization.";
-        setError(`Could not initialize Briants Lawnmower Expert Bot. ${errorMessage}. Please ensure your API key is correctly configured and try refreshing the page.`);
-        setChatSession(null); 
-      } finally {
-        setIsInitializing(false);
-      }
+  const submitDebugLogsToServer = async (logsToSubmit: LogEntry[], currentSessionId: string, currentUserId: string) => {
+    if (logsToSubmit.length === 0 || !currentSessionId) return;
+    
+    // User ID should be present if modal was submitted
+    if (!currentUserId) {
+        addDebugLog("WARN", `User ID is missing for debug log submission. Session: ${currentSessionId}. This should not happen after modal submission.`);
+        // Fallback or skip if userId is critical for backend
+    }
+
+    const payload = {
+      logs: logsToSubmit,
+      sessionId: currentSessionId,
+      userId: currentUserId || `UnknownUserAtSubmit-${currentSessionId.slice(-6)}`, 
     };
 
-    initializeChat();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+    try {
+      addDebugLog("DEBUG", `Submitting ${logsToSubmit.length} debug logs to server for session ${currentSessionId}, user ${payload.userId}.`);
+      const response = await fetch('https://lawnmower-backend.vercel.app/api/submit-debug-log', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        addDebugLog("INFO", "Debug logs successfully submitted to server.");
+      } else {
+        const errorText = await response.text();
+        addDebugLog("ERROR", `Failed to submit debug logs to server. Status: ${response.status}. Response: ${errorText.substring(0, 100)}`);
+      }
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "Unknown error";
+      addDebugLog("ERROR", `Exception during debug log submission: ${errorMessage}`);
+    }
+  };
+
+  useEffect(() => {
+    // This effect runs once on mount. SessionId is already set.
+    // The main purpose is to log that the app is waiting for User ID input.
+    getAndClearDebugLogs(); // Clear any pre-existing logs
+    addDebugLog("INFO", `App component mounted. Session ID: ${sessionId}. Awaiting User ID from modal.`);
+  }, [sessionId]);
+
+
+  const handleUserIdSubmit = async (submittedUserId: string) => {
+    addDebugLog("INFO", `User ID submitted: "${submittedUserId}". Session ID: ${sessionId}. Proceeding with chat initialization.`);
+    setUserId(submittedUserId);
+    setShowUserIdModal(false);
+    setIsChatInitializing(true);
+    setChatInitialized(false);
+    setError(null);
+    getAndClearDebugLogs(); // Clear logs from before modal submission
+
+    try {
+      addDebugLog("INFO", `Chat initialization started. User: ${submittedUserId}, Session: ${sessionId}`);
+      const session = createChatSession();
+      setChatSession(session);
+      setMessages([
+        { 
+          id: 'initial-bot-' + Date.now(), 
+          text: `Hello ${submittedUserId}! I'm Briants Lawnmower Expert Bot. I'm here to help you find the perfect lawnmower. Tell me about your needs, or try a suggestion:`, 
+          sender: 'bot', 
+          timestamp: new Date(),
+          initialPrompts: examplePromptsArray,
+        }
+      ]);
+      setChatInitialized(true);
+      addDebugLog("INFO", "Chat initialization successful.");
+    } catch (e) {
+      console.error("Failed to initialize chat session:", e);
+      const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during initialization.";
+      setError(`Could not initialize Briants Lawnmower Expert Bot. ${errorMessage}. Please ensure your API key is correctly configured and try refreshing the page.`);
+      addDebugLog("ERROR", `Chat initialization failed: ${errorMessage}. User: ${submittedUserId}, Session: ${sessionId}`);
+      setChatSession(null); 
+    } finally {
+      setIsChatInitializing(false);
+      const initLogs = getAndClearDebugLogs();
+      setDebugLogMessages(prevLogs => [...prevLogs, ...initLogs]); 
+      submitDebugLogsToServer(initLogs, sessionId, submittedUserId); 
+    }
+  };
 
   const handleSendMessage = async (inputText: string) => {
-    if (!inputText.trim() || !chatSession || isLoading) return;
+    if (!inputText.trim() || !chatSession || isLoading || !chatInitialized) return;
+
+    setShowInitialPrompts(false); 
+    getAndClearDebugLogs(); 
+    addDebugLog("INFO", `User input: "${inputText}" (User: ${userId}, Session: ${sessionId})`);
 
     const userMessage: ChatMessageData = { 
       id: 'user-' + Date.now(), 
@@ -65,34 +141,28 @@ const App: React.FC = () => {
 
     try {
       const response = await sendMessageToBot(chatSession, userMessage.text);
-      // The 'text' property is a getter that extracts the text content.
-      // It should be populated after any function calls are resolved by the model.
       const botMessageText = response.text; 
 
-      if (botMessageText) {
-        const botMessage: ChatMessageData = { 
-          id: 'bot-' + Date.now(), 
-          text: botMessageText, 
-          sender: 'bot', 
-          timestamp: new Date() 
-        };
-        setMessages(prev => [...prev, botMessage]);
+      let textToDisplay = botMessageText;
+      if (!botMessageText || botMessageText.trim() === "") {
+        addDebugLog("WARN", "AI returned empty or whitespace-only text. Displaying fallback message.");
+        textToDisplay = "I'm currently unable to provide a specific response. Could you please try rephrasing your request or ask something else?";
       } else {
-        // This case might occur if the model responds with only a function call
-        // and something unexpected happens, or if the final response is empty.
-        console.warn("Received an empty text response from the bot after potential function calls.");
-        const botMessage: ChatMessageData = { 
-          id: 'bot-empty-' + Date.now(), 
-          text: "I've processed your request. Is there anything else I can help with regarding lawnmowers?", 
-          sender: 'bot', 
-          timestamp: new Date() 
-        };
-        setMessages(prev => [...prev, botMessage]);
+        addDebugLog("INFO", `Displaying bot message: "${textToDisplay.substring(0,100)}${textToDisplay.length > 100 ? '...' : ''}"`)
       }
+
+      const botMessage: ChatMessageData = { 
+        id: 'bot-' + Date.now(), 
+        text: textToDisplay, 
+        sender: 'bot', 
+        timestamp: new Date() 
+      };
+      setMessages(prev => [...prev, botMessage]);
 
     } catch (e) {
       console.error("Error sending message or receiving response:", e);
       const errorMessage = e instanceof Error ? e.message : "An unknown error occurred with the bot.";
+      addDebugLog("ERROR", `Error in handleSendMessage: ${errorMessage}`);
       setError(`Briants Lawnmower Expert Bot encountered an issue: ${errorMessage}`);
       const errorBotMessage: ChatMessageData = {
         id: 'error-bot-' + Date.now(),
@@ -103,20 +173,63 @@ const App: React.FC = () => {
       setMessages(prev => [...prev, errorBotMessage]);
     } finally {
       setIsLoading(false);
+      const interactionLogs = getAndClearDebugLogs();
+      setDebugLogMessages(prevLogs => [...prevLogs, ...interactionLogs]); 
+      submitDebugLogsToServer(interactionLogs, sessionId, userId);
     }
   };
+  
+  const handlePromptClick = (promptText: string) => {
+    handleSendMessage(promptText);
+  };
 
-  if (isInitializing) {
+  const downloadDebugLog = () => {
+    const allLogs = debugLogMessages.map(log => `${log.timestamp} [${log.level}] ${log.message}`).join('\n');
+    const blob = new Blob([allLogs], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const safeUserId = userId.replace(/[^a-zA-Z0-9_.-]/g, '_') || 'UnknownUser';
+    link.download = `briants_bot_debug_log_${sessionId}_${safeUserId}_${new Date().toISOString().substring(0,19).replace(/[T:]/g,'-')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    const downloadLogEntry: LogEntry = {
+        timestamp: `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}.${new Date().getMilliseconds().toString().padStart(3, '0')}]`,
+        level: "INFO",
+        message: "User downloaded the debug log manually."
+    };
+    
+    setDebugLogMessages(prev => [...prev, downloadLogEntry]); 
+    submitDebugLogsToServer([downloadLogEntry], sessionId, userId);
+  };
+
+  // Render Flows
+  if (showUserIdModal) {
+    return <UserIdModal onSubmit={handleUserIdSubmit} />;
+  }
+
+  if (isChatInitializing) {
     return (
       <div className="flex flex-col h-screen items-center justify-center bg-background text-textDark p-4">
         <Spinner />
-        <p className="mt-4 text-lg">Initializing Briants Lawnmower Expert Bot...</p>
-        {error && <p className="mt-2 text-red-500 text-center max-w-md">{error}</p>}
+        <p className="mt-4 text-lg">Initializing Briants Lawnmower Expert Bot for {userId}...</p>
+        {debugLogMessages.length > 0 && (
+          <div className="mt-4 p-2 bg-gray-100 border border-gray-300 rounded max-h-40 w-full max-w-md overflow-y-auto text-xs">
+            <h5 className="font-semibold mb-1 text-sm">Initialization Log:</h5>
+            {debugLogMessages.map((log, index) => (
+              <pre key={`init-log-${index}`} className="whitespace-pre-wrap break-words text-gray-600 mb-0.5">
+                {`${log.timestamp} [${log.level}] ${log.message}`}
+              </pre>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
   
-  if (error && !chatSession && !isInitializing) { 
+  if (error && !chatInitialized && !isChatInitializing) { 
      return (
       <div className="flex flex-col h-screen items-center justify-center bg-background text-textDark p-4">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 text-red-500">
@@ -125,21 +238,44 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-semibold mt-4">Initialization Failed</h1>
         <p className="mt-2 text-red-600 text-center max-w-md">{error}</p>
         <p className="mt-2 text-textLight text-center max-w-md">Please check your internet connection and API key configuration, then refresh the page.</p>
+         {debugLogMessages.length > 0 && (
+          <div className="mt-4 p-2 bg-gray-100 border border-gray-300 rounded max-h-40 w-full max-w-md overflow-y-auto text-xs">
+            <h5 className="font-semibold mb-1 text-sm">Initialization Log:</h5>
+            {debugLogMessages.map((log, index) => (
+              <pre key={`init-log-fail-${index}`} className="whitespace-pre-wrap break-words text-gray-600 mb-0.5">
+                {`${log.timestamp} [${log.level}] ${log.message}`}
+              </pre>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
 
+  if (!chatInitialized) {
+    // Fallback if somehow modal is closed, not initializing, but chat isn't ready (shouldn't happen with current logic)
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-background text-textDark p-4">
+        <p className="text-lg">Preparing the application...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-screen max-w-3xl mx-auto bg-white shadow-2xl rounded-lg overflow-hidden my-0 md:my-8">
+    <div className="flex flex-col h-screen max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto bg-white shadow-2xl rounded-lg overflow-hidden my-0 md:my-4">
       <header className="bg-primary text-white p-4 text-center shadow-md">
         <h1 className="text-2xl font-bold">Briants Lawnmower Expert Bot</h1>
-        <p className="text-sm opacity-90">Your AI companion for all things Briants Lawnmowers</p>
+        <p className="text-sm opacity-90">User: {userId}</p>
       </header>
 
       <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50">
         {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+          <ChatMessage 
+            key={msg.id} 
+            message={msg}
+            showInitialPrompts={showInitialPrompts && msg.sender === 'bot' && msg.initialPrompts && msg.initialPrompts.length > 0}
+            onPromptClick={handlePromptClick}
+          />
         ))}
         {isLoading && messages.length > 0 && messages[messages.length-1].sender === 'user' && (
           <div className="flex justify-start mb-4">
@@ -159,7 +295,27 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !chatInitialized} />
+
+      {debugLogMessages.length > 0 && (
+        <div className="p-3 bg-gray-100 border-t border-gray-300 max-h-60 overflow-y-auto text-xs">
+          <div className="flex justify-between items-center sticky top-0 bg-gray-100 py-1 mb-2 z-10 border-b border-gray-200">
+            <h4 className="font-semibold text-sm text-textDark">Debug Log (Session: {sessionId})</h4>
+            <button
+              onClick={downloadDebugLog}
+              className="bg-primary hover:bg-green-700 text-white text-xs font-semibold py-1 px-3 rounded-md transition-colors"
+              title="Download debug log as a .txt file"
+            >
+              Download Log
+            </button>
+          </div>
+          {debugLogMessages.map((log, index) => (
+            <pre key={`debug-log-${index}`} className="whitespace-pre-wrap break-words text-gray-700 mb-0.5 leading-relaxed">
+             {`${log.timestamp} [${log.level}] ${log.message}`}
+            </pre>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

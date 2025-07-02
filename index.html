@@ -6,7 +6,7 @@
   <title>Briants Lawnmower Expert Bot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -21,7 +21,7 @@
             textLight: '#757575',
           },
           fontFamily: {
-            sans: ['Poppins', 'sans-serif'], // Set Poppins as the base sans-serif font
+            sans: ['Poppins', 'sans-serif'],
           }
         }
       }
@@ -37,9 +37,31 @@
   }
 }
 </script>
+  <style>
+    /* Ensure Poppins is applied globally */
+    body {
+      font-family: 'Poppins', sans-serif;
+    }
+    /* Custom scrollbar for a more polished look */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a1a1a1;
+    }
+  </style>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-background font-sans">
+<body class="bg-background">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
