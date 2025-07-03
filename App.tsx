@@ -36,7 +36,7 @@ const App: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(scrollToBottom, [messages]);
+  // useEffect(scrollToBottom, [messages]);
 
   const submitDebugLogsToServer = async (logsToSubmit: LogEntry[], currentSessionId: string, currentUserId: string) => {
     if (logsToSubmit.length === 0 || !currentSessionId) return;
