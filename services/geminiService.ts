@@ -2,7 +2,7 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, FunctionDeclaration, Part, Type, FunctionCall as GeminiFunctionCall } from "@google/genai"; // Renamed FunctionCall to avoid conflict
 import { Product } from "../types";
 
-const API_KEY = process.env.API_KEY;
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 if (!API_KEY) {
   console.error("API_KEY for Gemini is not set. Please configure process.env.API_KEY.");
