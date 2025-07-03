@@ -21,9 +21,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false); // For message sending
   const [error, setError] = useState<string | null>(null);
   const [showInitialPrompts, setShowInitialPrompts] = useState<boolean>(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [debugLogMessages, setDebugLogMessages] = useState<LogEntry[]>([]);
-  
+  const messagesEndRef = useRef<HTMLDivElement>(null);  
   // State for User ID and Session ID
   const [userId, setUserId] = useState<string>('');
   const [sessionId] = useState<string>(() => Date.now().toString(36) + Math.random().toString(36).substring(2));
@@ -117,7 +115,6 @@ const App: React.FC = () => {
     } finally {
       setIsChatInitializing(false);
       const initLogs = getAndClearDebugLogs();
-      setDebugLogMessages(prevLogs => [...prevLogs, ...initLogs]); 
       submitDebugLogsToServer(initLogs, sessionId, submittedUserId); 
     }
   };
@@ -174,35 +171,12 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
       const interactionLogs = getAndClearDebugLogs();
-      setDebugLogMessages(prevLogs => [...prevLogs, ...interactionLogs]); 
       submitDebugLogsToServer(interactionLogs, sessionId, userId);
     }
   };
   
   const handlePromptClick = (promptText: string) => {
     handleSendMessage(promptText);
-  };
-
-  const downloadDebugLog = () => {
-    const allLogs = debugLogMessages.map(log => `${log.timestamp} [${log.level}] ${log.message}`).join('\n');
-    const blob = new Blob([allLogs], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    const safeUserId = userId.replace(/[^a-zA-Z0-9_.-]/g, '_') || 'UnknownUser';
-    link.download = `briants_bot_debug_log_${sessionId}_${safeUserId}_${new Date().toISOString().substring(0,19).replace(/[T:]/g,'-')}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    
-    const downloadLogEntry: LogEntry = {
-        timestamp: `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}.${new Date().getMilliseconds().toString().padStart(3, '0')}]`,
-        level: "INFO",
-        message: "User downloaded the debug log manually."
-    };
-    
-    setDebugLogMessages(prev => [...prev, downloadLogEntry]); 
-    submitDebugLogsToServer([downloadLogEntry], sessionId, userId);
   };
 
   // Render Flows
@@ -215,16 +189,6 @@ const App: React.FC = () => {
       <div className="flex flex-col h-screen items-center justify-center bg-background text-textDark p-4">
         <Spinner />
         <p className="mt-4 text-lg">Initializing Briants Lawnmower Expert Bot for {userId}...</p>
-        {debugLogMessages.length > 0 && (
-          <div className="mt-4 p-2 bg-gray-100 border border-gray-300 rounded max-h-40 w-full max-w-md overflow-y-auto text-xs">
-            <h5 className="font-semibold mb-1 text-sm">Initialization Log:</h5>
-            {debugLogMessages.map((log, index) => (
-              <pre key={`init-log-${index}`} className="whitespace-pre-wrap break-words text-gray-600 mb-0.5">
-                {`${log.timestamp} [${log.level}] ${log.message}`}
-              </pre>
-            ))}
-          </div>
-        )}
       </div>
     );
   }
@@ -238,16 +202,6 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-semibold mt-4">Initialization Failed</h1>
         <p className="mt-2 text-red-600 text-center max-w-md">{error}</p>
         <p className="mt-2 text-textLight text-center max-w-md">Please check your internet connection and API key configuration, then refresh the page.</p>
-         {debugLogMessages.length > 0 && (
-          <div className="mt-4 p-2 bg-gray-100 border border-gray-300 rounded max-h-40 w-full max-w-md overflow-y-auto text-xs">
-            <h5 className="font-semibold mb-1 text-sm">Initialization Log:</h5>
-            {debugLogMessages.map((log, index) => (
-              <pre key={`init-log-fail-${index}`} className="whitespace-pre-wrap break-words text-gray-600 mb-0.5">
-                {`${log.timestamp} [${log.level}] ${log.message}`}
-              </pre>
-            ))}
-          </div>
-        )}
       </div>
     );
   }
@@ -296,26 +250,6 @@ const App: React.FC = () => {
       )}
 
       <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !chatInitialized} />
-
-      {debugLogMessages.length > 0 && (
-        <div className="p-3 bg-gray-100 border-t border-gray-300 max-h-60 overflow-y-auto text-xs">
-          <div className="flex justify-between items-center sticky top-0 bg-gray-100 py-1 mb-2 z-10 border-b border-gray-200">
-            <h4 className="font-semibold text-sm text-textDark">Debug Log (Session: {sessionId})</h4>
-            <button
-              onClick={downloadDebugLog}
-              className="bg-primary hover:bg-green-700 text-white text-xs font-semibold py-1 px-3 rounded-md transition-colors"
-              title="Download debug log as a .txt file"
-            >
-              Download Log
-            </button>
-          </div>
-          {debugLogMessages.map((log, index) => (
-            <pre key={`debug-log-${index}`} className="whitespace-pre-wrap break-words text-gray-700 mb-0.5 leading-relaxed">
-             {`${log.timestamp} [${log.level}] ${log.message}`}
-            </pre>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
