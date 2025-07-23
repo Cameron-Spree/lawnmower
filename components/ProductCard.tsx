@@ -102,18 +102,36 @@ const ProductCard: React.FC<ProductCardProps> = ({ name, sku, imageUrl, productU
           </p>
         )}
 
-        <a
-          href={hasValidProductUrl ? productUrl : "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`inline-block text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-150 ease-in-out text-sm ${
-            hasValidProductUrl ? 'bg-primary hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
-          }`}
-          aria-disabled={!hasValidProductUrl}
-          onClick={(e) => { if (!hasValidProductUrl) e.preventDefault(); }}
-        >
-          View Product
-        </a>
+        <div className="flex items-center space-x-2">
+          <a
+            href={hasValidProductUrl ? productUrl : "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-block text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-150 ease-in-out text-sm ${
+              hasValidProductUrl ? 'bg-primary hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'
+            }`}
+            aria-disabled={!hasValidProductUrl}
+            onClick={(e) => { if (!hasValidProductUrl) e.preventDefault(); }}
+          >
+            View Product
+          </a>
+          <button
+            onClick={() => {
+              const productInfo = `
+                Name: ${name}
+                SKU: ${sku}
+                Price: ${priceString}
+                Description: ${description}
+                Features: ${features}
+                Reasoning: ${reasoning}
+              `;
+              navigator.clipboard.writeText(productInfo.trim());
+            }}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors duration-150 ease-in-out text-sm"
+          >
+            Copy Info
+          </button>
+        </div>
         
         {/* Reasoning moved to the top section, so it's commented out/removed from here if it was previously duplicated */}
       </div>

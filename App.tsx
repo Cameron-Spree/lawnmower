@@ -179,6 +179,23 @@ const App: React.FC = () => {
     handleSendMessage(promptText);
   };
 
+  const handleClearChat = () => {
+    setMessages([]);
+    setShowInitialPrompts(true);
+    setError(null);
+    addDebugLog("INFO", "Chat cleared by user.");
+    // Optionally, re-display the initial welcome message with prompts
+    setMessages([
+      {
+        id: 'initial-bot-' + Date.now(),
+        text: `Hello ${userId}! I'm Briants Lawnmower Expert Bot. How can I help you today? You can ask me anything about our lawnmowers, or try one of these suggestions:`,
+        sender: 'bot',
+        timestamp: new Date(),
+        initialPrompts: examplePromptsArray,
+      }
+    ]);
+  };
+
   // Render Flows
   if (showUserIdModal) {
     return <UserIdModal onSubmit={handleUserIdSubmit} />;
@@ -249,7 +266,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading || !chatInitialized} />
+      <ChatInput onSendMessage={handleSendMessage} onClearChat={handleClearChat} isLoading={isLoading || !chatInitialized} />
     </div>
   );
 };
